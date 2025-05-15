@@ -15,7 +15,7 @@ const oauth = OAuth({
 
 export default async function handler(req, res) {
   try {
-    const callbackBaseUrl = 'https://your-vercel-domain.vercel.app/api/callback'; // Update this to your actual deployed Vercel callback URL
+    const callbackBaseUrl = 'https://oauth-proxy-chi.vercel.app/api/callback'; // Update this to your actual deployed Vercel callback URL
 
     const requestTokenUrl = 'https://api.smugmug.com/services/oauth/1.0a/getRequestToken';
     const data = {
