@@ -1,7 +1,6 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import axios from 'axios';
-import querystring from 'querystring';
 
 const oauth = OAuth({
   consumer: {
@@ -22,52 +21,47 @@ export default async function handler(req, res) {
   }
 
   try {
-    // STEP 1: Get authenticated user
+    // Step 1: Get NickName
     const userInfoUrl = 'https://api.smugmug.com/api/v2!authuser';
-    const userHeaders = oauth.toHeader(
-      oauth.authorize({ url: userInfoUrl, method: 'GET' }, {
-        key: access_token,
-        secret: access_token_secret,
-      })
-    );
+    const authHeaders = oauth.toHeader(oauth.authorize({ url: userInfoUrl, method: 'GET' }, {
+      key: access_token,
+      secret: access_token_secret,
+    }));
 
     const userInfoResponse = await axios.get(userInfoUrl, {
       headers: {
-        ...userHeaders,
+        ...authHeaders,
         Accept: 'application/json',
       },
     });
 
-    const username = userInfoResponse.data.Response.User.NickName;
-    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${username}!folderroot`;
+    const nickname = userInfoResponse.data?.Response?.User?.NickName;
+    if (!nickname) throw new Error('Nickname not found');
 
-    // STEP 2: Use x-www-form-urlencoded format
-    const postData = {
+    // Step 2: Create folder
+    const createFolderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
+    const method = 'POST';
+    const data = {
       Name: folder_name,
-      UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
+      UrlName: folder_name.replace(/\s+/g, '-').toLowerCase(),
     };
 
-    const authHeader = oauth.toHeader(
-      oauth.authorize(
-        { url: folderUrl, method: 'POST', data: postData },
-        { key: access_token, secret: access_token_secret }
-      )
-    );
+    const folderHeaders = oauth.toHeader(oauth.authorize({ url: createFolderUrl, method, data }, {
+      key: access_token,
+      secret: access_token_secret,
+    }));
 
-    const encodedData = querystring.stringify(postData);
-
-    const folderResponse = await axios.post(folderUrl, encodedData, {
+    const response = await axios.post(createFolderUrl, data, {
       headers: {
-        ...authHeader,
+        ...folderHeaders,
         Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
     });
 
-    return res.status(200).json({ message: 'Folder created', data: folderResponse.data });
-
+    res.status(200).json({ message: 'Folder created successfully', details: response.data });
   } catch (err) {
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Failed to create folder',
       details: err.response?.data || err.message,
     });
