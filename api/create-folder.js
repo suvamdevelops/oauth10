@@ -1,6 +1,7 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import axios from 'axios';
+import querystring from 'querystring';
 
 const oauth = OAuth({
   consumer: {
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // STEP 1: Get authenticated user info to extract username
+    // STEP 1: Get authenticated user
     const userInfoUrl = 'https://api.smugmug.com/api/v2!authuser';
     const userHeaders = oauth.toHeader(
       oauth.authorize({ url: userInfoUrl, method: 'GET' }, {
@@ -40,28 +41,31 @@ export default async function handler(req, res) {
     const username = userInfoResponse.data.Response.User.NickName;
     const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${username}!folderroot`;
 
-    // STEP 2: Make request to create a folder
+    // STEP 2: Use x-www-form-urlencoded format
     const postData = {
       Name: folder_name,
       UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
     };
 
-    const postHeaders = oauth.toHeader(
-      oauth.authorize({ url: folderUrl, method: 'POST', data: postData }, {
-        key: access_token,
-        secret: access_token_secret,
-      })
+    const authHeader = oauth.toHeader(
+      oauth.authorize(
+        { url: folderUrl, method: 'POST', data: postData },
+        { key: access_token, secret: access_token_secret }
+      )
     );
 
-    const folderResponse = await axios.post(folderUrl, postData, {
+    const encodedData = querystring.stringify(postData);
+
+    const folderResponse = await axios.post(folderUrl, encodedData, {
       headers: {
-        ...postHeaders,
+        ...authHeader,
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
 
     return res.status(200).json({ message: 'Folder created', data: folderResponse.data });
+
   } catch (err) {
     return res.status(500).json({
       error: 'Failed to create folder',
