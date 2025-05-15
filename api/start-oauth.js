@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     const response = await axios.get(url, { headers });
     res.redirect(`https://api.smugmug.com/services/oauth/1.0a/authorize?${response.data}`);
   } catch (err) {
+    console.error('OAuth start failed:', err);
     res.status(500).json({ error: 'OAuth start failed', details: err.message });
   }
 }
