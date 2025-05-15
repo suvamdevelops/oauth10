@@ -37,7 +37,11 @@ export default async function handler(req, res) {
       },
     });
 
-    const folderUri = userResp.data.Response.User.Uris.FolderUri;
+    const folderUri = userResp?.data?.Response?.User?.Uris?.FolderUri;
+    if (!folderUri) {
+    return res.status(500).json({ error: 'Missing FolderUri in user profile response' });
+    }
+
     const folderUrl = `https://api.smugmug.com${folderUri}`;
 
     // Step 2: Create Folder
