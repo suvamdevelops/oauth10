@@ -20,44 +20,52 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required query parameters' });
   }
 
-  const token = {
-    key: access_token,
-    secret: access_token_secret,
-  };
-
   try {
-    // Step 1: Get the user’s folder URI
-    const authUserUrl = 'https://api.smugmug.com/api/v2!authuser';
-    const authHeaders = oauth.toHeader(oauth.authorize({ url: authUserUrl, method: 'GET' }, token));
-    authHeaders['Accept'] = 'application/json';
+    // STEP 1: Get authenticated user info to extract username
+    const userInfoUrl = 'https://api.smugmug.com/api/v2!authuser';
+    const userHeaders = oauth.toHeader(
+      oauth.authorize({ url: userInfoUrl, method: 'GET' }, {
+        key: access_token,
+        secret: access_token_secret,
+      })
+    );
 
-    const authResponse = await axios.get(authUserUrl, { headers: authHeaders });
-    const folderUri = authResponse.data.Response.User.Uris.Folder;
+    const userInfoResponse = await axios.get(userInfoUrl, {
+      headers: {
+        ...userHeaders,
+        Accept: 'application/json',
+      },
+    });
 
-    // Step 2: Construct full URL to POST the folder
-    const folderPostUrl = `https://api.smugmug.com${folderUri}`;
-    const postHeaders = oauth.toHeader(oauth.authorize({ url: folderPostUrl, method: 'POST' }, token));
-    postHeaders['Content-Type'] = 'application/json';
-    postHeaders['Accept'] = 'application/json';
+    const username = userInfoResponse.data.Response.User.NickName;
+    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${username}!folderroot`;
 
-    const postBody = {
+    // STEP 2: Make request to create a folder
+    const postData = {
       Name: folder_name,
       UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
     };
 
-    const createResponse = await axios.post(folderPostUrl, postBody, {
-      headers: postHeaders,
+    const postHeaders = oauth.toHeader(
+      oauth.authorize({ url: folderUrl, method: 'POST', data: postData }, {
+        key: access_token,
+        secret: access_token_secret,
+      })
+    );
+
+    const folderResponse = await axios.post(folderUrl, postData, {
+      headers: {
+        ...postHeaders,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
     });
 
-    res.status(200).json({
-      message: 'Folder created successfully',
-      data: createResponse.data,
-    });
-  } catch (error) {
-    console.error('Create folder failed:', error.response?.data || error.message);
-    res.status(500).json({
+    return res.status(200).json({ message: 'Folder created', data: folderResponse.data });
+  } catch (err) {
+    return res.status(500).json({
       error: 'Failed to create folder',
-      details: error.response?.data || error.message,
+      details: err.response?.data || err.message,
     });
   }
 }
