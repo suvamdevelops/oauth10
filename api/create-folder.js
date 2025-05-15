@@ -20,50 +20,37 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required query parameters' });
   }
 
+  const method = 'POST';
+  const createFolderUrl = `https://api.smugmug.com/api/v2/folder/user/suvamp!folderroot`;
+
+  const request_data = {
+    url: createFolderUrl,
+    method: method,
+  };
+
+  const token = {
+    key: access_token,
+    secret: access_token_secret,
+  };
+
+  const folderHeaders = oauth.toHeader(oauth.authorize(request_data, token));
+  folderHeaders['Content-Type'] = 'application/json';
+  folderHeaders['Accept'] = 'application/json';
+
   try {
-    // Step 1: Get NickName
-    const userInfoUrl = 'https://api.smugmug.com/api/v2!authuser';
-    const authHeaders = oauth.toHeader(oauth.authorize({ url: userInfoUrl, method: 'GET' }, {
-      key: access_token,
-      secret: access_token_secret,
-    }));
-
-    const userInfoResponse = await axios.get(userInfoUrl, {
-      headers: {
-        ...authHeaders,
-        Accept: 'application/json',
+    const response = await axios.post(
+      createFolderUrl,
+      {
+        Name: folder_name,
+        UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
       },
-    });
+      {
+        headers: folderHeaders,
+      }
+    );
 
-    const nickname = userInfoResponse.data?.Response?.User?.NickName;
-    if (!nickname) throw new Error('Nickname not found');
-
-    // Step 2: Create folder
-    const createFolderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
-    const method = 'POST';
-    const data = {
-      Name: folder_name,
-      UrlName: folder_name.replace(/\s+/g, '-').toLowerCase(),
-    };
-
-    const folderHeaders = oauth.toHeader(oauth.authorize({ url: createFolderUrl, method, data }, {
-      key: access_token,
-      secret: access_token_secret,
-    }));
-
-    const response = await axios.post(createFolderUrl, data, {
-      headers: {
-        ...folderHeaders,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    res.status(200).json({ message: 'Folder created successfully', details: response.data });
+    res.status(200).json({ message: 'Folder created', data: response.data });
   } catch (err) {
-    res.status(500).json({
-      error: 'Failed to create folder',
-      details: err.response?.data || err.message,
-    });
+    res.status(500).json({ error: 'Failed to create folder', details: err.response?.data || err.message });
   }
 }
