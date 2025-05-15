@@ -1,3 +1,4 @@
+import url from 'url';
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import axios from 'axios';
@@ -15,36 +16,44 @@ const oauth = OAuth({
 
 export default async function handler(req, res) {
   try {
-    const { oauth_token, oauth_verifier, token_secret } = req.query;
+    const { oauth_token, oauth_verifier, oauth_callback } = req.query;
 
-    if (!oauth_token || !oauth_verifier || !token_secret) {
+    if (!oauth_token || !oauth_verifier || !oauth_callback) {
       return res.status(400).json({ error: 'Missing required query parameters' });
     }
 
-    const accessTokenUrl = 'https://api.smugmug.com/services/oauth/1.0a/getAccessToken';
+    // Decode oauth_callback URL and parse token_secret
+    const decodedCallback = decodeURIComponent(oauth_callback);
+    const parsedCallbackUrl = url.parse(decodedCallback, true);
+    const token_secret = parsedCallbackUrl.query.token_secret;
 
-    const token = {
-      key: oauth_token,
-      secret: token_secret,  // this is the request token secret passed as query param
-    };
-
-    const data = { oauth_verifier };
-
-    const headers = oauth.toHeader(oauth.authorize({ url: accessTokenUrl, method: 'POST', data }, token));
-
-    // SmugMug expects a POST request here
-    const response = await axios.post(accessTokenUrl, null, { headers });
-
-    // Parse access token response (query string format)
-    const responseParams = new URLSearchParams(response.data);
-    const accessToken = responseParams.get('oauth_token');
-    const accessTokenSecret = responseParams.get('oauth_token_secret');
-
-    if (!accessToken || !accessTokenSecret) {
-      return res.status(500).json({ error: 'Failed to get access token' });
+    if (!token_secret) {
+      return res.status(400).json({ error: 'Missing token_secret in oauth_callback' });
     }
 
-    // Redirect user back to your Bubble app with the tokens
+    // Prepare OAuth token object with request token and secret
+    const token = { key: oauth_token, secret: token_secret };
+
+    // SmugMug access token URL
+    const accessTokenUrl = 'https://api.smugmug.com/services/oauth/1.0a/getAccessToken';
+
+    // Generate OAuth headers for access token request
+    const data = { oauth_verifier };
+    const headers = oauth.toHeader(oauth.authorize({ url: accessTokenUrl, method: 'POST', data }, token));
+
+    // Request access token from SmugMug
+    const response = await axios.post(accessTokenUrl, null, { headers });
+
+    // Parse access token and secret from response (response.data is urlencoded string)
+    const params = new URLSearchParams(response.data);
+    const accessToken = params.get('oauth_token');
+    const accessTokenSecret = params.get('oauth_token_secret');
+
+    if (!accessToken || !accessTokenSecret) {
+      return res.status(500).json({ error: 'Failed to get access token from SmugMug' });
+    }
+
+    // Redirect user back to your Bubble app with access token and secret as query params
     const bubbleRedirectUrl = `https://smugmug-integration.bubbleapps.io/version-test?access_token=${encodeURIComponent(accessToken)}&access_secret=${encodeURIComponent(accessTokenSecret)}`;
 
     res.redirect(bubbleRedirectUrl);
