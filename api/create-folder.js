@@ -1,71 +1,60 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
-import axios from 'axios';
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 
 const oauth = OAuth({
   consumer: {
-    key: process.env.SMUGMUG_CONSUMER_KEY,
-    secret: process.env.SMUGMUG_CONSUMER_SECRET,
+    key: process.env.SMUGMUG_API_KEY,
+    secret: process.env.SMUGMUG_API_SECRET,
   },
   signature_method: 'HMAC-SHA1',
-  hash_function(base, key) {
-    return crypto.createHmac('sha1', key).update(base).digest('base64');
+  hash_function(base_string, key) {
+    return crypto
+      .createHmac('sha1', key)
+      .update(base_string)
+      .digest('base64');
   },
 });
 
-export default async function handler(req, res) {
-  const { access_token, access_token_secret, folder_name } = req.query;
+export async function POST(req) {
+  const { accessToken, accessTokenSecret, nickname, folderName } = await req.json();
 
-  if (!access_token || !access_token_secret || !folder_name) {
-    return res.status(400).json({ error: 'Missing required query parameters' });
+  if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const token = {
-    key: access_token,
-    secret: access_token_secret,
+  const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
+  const method = 'POST';
+  const data = {
+    Name: folderName,
+    UrlName: folderName.replace(/\s+/g, ''),
   };
 
-  try {
-    // Step 1: Fetch user's NickName
-    const nicknameUrl = 'https://api.smugmug.com/api/v2!authuser';
-    const authHeader1 = oauth.toHeader(oauth.authorize({ url: nicknameUrl, method: 'GET' }, token));
+  const authHeader = oauth.toHeader(
+    oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
+  );
 
-    const userResp = await axios.get(nicknameUrl, {
+  try {
+    const response = await fetch(url, {
+      method,
       headers: {
-        ...authHeader1,
+        Authorization: authHeader.Authorization,
+        'Content-Type': 'application/json',
         Accept: 'application/json',
       },
+      body: JSON.stringify(data),
     });
 
-    const nickname = userResp.data.Response.User.NickName;
+    const result = await response.json();
 
-    if (!nickname) {
-      return res.status(500).json({ error: 'Missing NickName in user info' });
+    if (!response.ok) {
+      return NextResponse.json({ error: 'Failed to create folder', details: result }, { status: response.status });
     }
 
-    // Step 2: Create Folder using the NickName
-    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
-    const folderPayload = {
-      Name: folder_name,
-      UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
-    };
-
-    // IMPORTANT: Do NOT pass folderPayload to oauth.authorize for POST with JSON body
-    const authHeader2 = oauth.toHeader(
-      oauth.authorize({ url: folderUrl, method: 'POST' }, token)
-    );
-
-    const folderResp = await axios.post(folderUrl, folderPayload, {
-      headers: {
-        ...authHeader2,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    res.status(200).json({ message: 'Folder created successfully', data: folderResp.data });
+    return NextResponse.json({ message: 'Folder created successfully', result });
   } catch (err) {
-    const message = err.response?.data || err.message || 'Unknown error';
-    res.status(500).json({ error: 'Failed to create folder', details: message });
+    return NextResponse.json({ error: 'Unexpected error', details: err.message }, { status: 500 });
   }
 }
