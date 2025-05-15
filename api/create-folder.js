@@ -1,5 +1,10 @@
+// File: /api/create-folder.js
+
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 
 const oauth = OAuth({
   consumer: {
@@ -15,53 +20,45 @@ const oauth = OAuth({
   },
 });
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+export async function POST(req) {
+  const { accessToken, accessTokenSecret, folderName } = await req.json();
+
+  if (!accessToken || !accessTokenSecret || !folderName) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  const nickname = 'suvamp'; // Static value for now
+  const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
+
+  const method = 'POST';
+
+  const params = new URLSearchParams();
+  params.append('Name', folderName);
+  params.append('UrlName', folderName.replace(/\s+/g, '')); // SmugMug prefers camelCase or no spaces
+
+  const authHeader = oauth.toHeader(
+    oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
+  );
+
   try {
-    const { accessToken, accessTokenSecret, nickname, folderName } = req.body;
-
-    if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
-    const method = 'POST';
-
-    // Ensure UrlName starts with uppercase letter
-    const urlSafeName = folderName.replace(/\s+/g, '');
-    const capitalizedUrlName = urlSafeName.charAt(0).toUpperCase() + urlSafeName.slice(1);
-
-    const data = {
-      Name: folderName,
-      UrlName: capitalizedUrlName,
-      AutoRename: true,
-    };
-
-    const authHeader = oauth.toHeader(
-      oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
-    );
-
     const response = await fetch(url, {
       method,
       headers: {
         Authorization: authHeader.Authorization,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
       },
-      body: JSON.stringify(data),
+      body: params.toString(),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'Failed to create folder', details: result });
+      return NextResponse.json({ error: 'Failed to create folder', details: result }, { status: response.status });
     }
 
-    return res.status(200).json({ message: 'Folder created successfully', result });
-  } catch (error) {
-    return res.status(500).json({ error: 'Unexpected error', details: error.message });
+    return NextResponse.json({ message: 'Folder created successfully', result });
+  } catch (err) {
+    return NextResponse.json({ error: 'Unexpected error', details: err.message }, { status: 500 });
   }
 }
