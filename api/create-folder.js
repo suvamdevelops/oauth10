@@ -43,7 +43,7 @@ export default async function handler(req, res) {
 
     // Step 2: Create Folder
     const urlName = folder_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
+    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${encodeURIComponent(nickname)}!folderroot`;
     const folderPayload = {
       Name: folder_name,
       UrlName: urlName,
