@@ -14,15 +14,31 @@ const oauth = OAuth({
 });
 
 export default async function handler(req, res) {
-  const url = 'https://api.smugmug.com/services/oauth/1.0a/getRequestToken';
-  const data = { oauth_callback: process.env.CALLBACK_URL };
-  const headers = oauth.toHeader(oauth.authorize({ url, method: 'GET', data }));
+  const requestData = {
+    url: 'https://api.smugmug.com/services/oauth/1.0a/getRequestToken',
+    method: 'POST',
+    data: {
+      oauth_callback: 'https://smugmug-integration.bubbleapps.io/version-test'
+    },
+  };
+
+  const headers = oauth.toHeader(oauth.authorize(requestData));
 
   try {
-    const response = await axios.get(url, { headers });
-    res.redirect(`https://api.smugmug.com/services/oauth/1.0a/authorize?${response.data}`);
-  } catch (err) {
-    console.error('OAuth start failed:', err);
-    res.status(500).json({ error: 'OAuth start failed', details: err.message });
+    const response = await axios.post(requestData.url, null, {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    const params = new URLSearchParams(response.data);
+    const oauthToken = params.get('oauth_token');
+
+    const redirectUrl = `https://secure.smugmug.com/services/oauth/1.0a/authorize?oauth_token=${oauthToken}`;
+
+    res.redirect(redirectUrl);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get request token', details: error.message });
   }
 }
