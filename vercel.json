@@ -1,7 +1,5 @@
 {
   "functions": {
-    "api/create-folder.js": {
-      "runtime": "nodejs18.x"
-    }
+    "api/create-folder.js": {}
   }
 }
