@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Step 1: Fetch user's NickName and Folder Uri
+    // Step 1: Fetch user's NickName
     const nicknameUrl = 'https://api.smugmug.com/api/v2!authuser';
     const authHeader1 = oauth.toHeader(oauth.authorize({ url: nicknameUrl, method: 'GET' }, token));
 
@@ -38,21 +38,21 @@ export default async function handler(req, res) {
     });
 
     const nickname = userResp.data.Response.User.NickName;
-    const folderUri = userResp.data.Response.User.Uris.Folder.Uri; // e.g. "/api/v2/folder/user/suvamp"
 
-    if (!folderUri) {
-      return res.status(500).json({ error: 'Missing FolderUri in user profile response' });
+    if (!nickname) {
+      return res.status(500).json({ error: 'Missing NickName in user info' });
     }
 
-    // Step 2: Create Folder using the FolderUri without !folderroot
-    const folderUrl = `https://api.smugmug.com${folderUri}`;
+    // Step 2: Create Folder using the NickName
+    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}`;
     const folderPayload = {
       Name: folder_name,
       UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
     };
 
+    // IMPORTANT: Do NOT pass folderPayload to oauth.authorize for POST with JSON body
     const authHeader2 = oauth.toHeader(
-      oauth.authorize({ url: folderUrl, method: 'POST', data: folderPayload }, token)
+      oauth.authorize({ url: folderUrl, method: 'POST' }, token)
     );
 
     const folderResp = await axios.post(folderUrl, folderPayload, {
