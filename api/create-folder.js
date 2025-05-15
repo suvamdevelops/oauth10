@@ -1,5 +1,3 @@
-// File: /api/create-folder.js
-
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import axios from 'axios';
@@ -28,33 +26,31 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Step 1: Get the user's NickName
-    const authUserUrl = 'https://api.smugmug.com/api/v2!authuser';
-    const authHeader1 = oauth.toHeader(
-      oauth.authorize({ url: authUserUrl, method: 'GET' }, token)
-    );
+    // Step 1: Fetch user's NickName
+    const nicknameUrl = 'https://api.smugmug.com/api/v2!authuser';
+    const authHeader1 = oauth.toHeader(oauth.authorize({ url: nicknameUrl, method: 'GET' }, token));
 
-    const authUserRes = await axios.get(authUserUrl, {
+    const userResp = await axios.get(nicknameUrl, {
       headers: {
         ...authHeader1,
         Accept: 'application/json',
       },
     });
 
-    const nickname = authUserRes.data.Response.User.NickName;
+    const nickname = userResp.data.Response.User.NickName;
 
-    // Step 2: Create folder using NickName
-    const createUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
-    const data = {
+    // Step 2: Create Folder using the NickName
+    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
+    const folderPayload = {
       Name: folder_name,
       UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
     };
 
     const authHeader2 = oauth.toHeader(
-      oauth.authorize({ url: createUrl, method: 'POST', data }, token)
+      oauth.authorize({ url: folderUrl, method: 'POST', data: folderPayload }, token)
     );
 
-    const createRes = await axios.post(createUrl, data, {
+    const folderResp = await axios.post(folderUrl, folderPayload, {
       headers: {
         ...authHeader2,
         Accept: 'application/json',
@@ -62,8 +58,9 @@ export default async function handler(req, res) {
       },
     });
 
-    res.status(200).json({ message: 'Folder created', data: createRes.data });
+    res.status(200).json({ message: 'Folder created successfully', data: folderResp.data });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create folder', details: err.response?.data || err.message });
+    const message = err.response?.data || err.message || 'Unknown error';
+    res.status(500).json({ error: 'Failed to create folder', details: message });
   }
 }
