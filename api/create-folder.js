@@ -1,8 +1,5 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
-import { NextResponse } from 'next/server';
-
-export const dynamic = 'force-dynamic';
 
 const oauth = OAuth({
   consumer: {
@@ -18,25 +15,35 @@ const oauth = OAuth({
   },
 });
 
-export async function POST(req) {
-  const { accessToken, accessTokenSecret, nickname, folderName } = await req.json();
-
-  if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
-  const method = 'POST';
-  const data = {
-    Name: folderName,
-    UrlName: folderName.replace(/\s+/g, ''),
-  };
-
-  const authHeader = oauth.toHeader(
-    oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
-  );
-
   try {
+    const { accessToken, accessTokenSecret, nickname, folderName } = req.body;
+
+    if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
+    const method = 'POST';
+
+    // Ensure UrlName starts with uppercase letter
+    const urlSafeName = folderName.replace(/\s+/g, '');
+    const capitalizedUrlName = urlSafeName.charAt(0).toUpperCase() + urlSafeName.slice(1);
+
+    const data = {
+      Name: folderName,
+      UrlName: capitalizedUrlName,
+      AutoRename: true,
+    };
+
+    const authHeader = oauth.toHeader(
+      oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
+    );
+
     const response = await fetch(url, {
       method,
       headers: {
@@ -50,11 +57,11 @@ export async function POST(req) {
     const result = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to create folder', details: result }, { status: response.status });
+      return res.status(response.status).json({ error: 'Failed to create folder', details: result });
     }
 
-    return NextResponse.json({ message: 'Folder created successfully', result });
-  } catch (err) {
-    return NextResponse.json({ error: 'Unexpected error', details: err.message }, { status: 500 });
+    return res.status(200).json({ message: 'Folder created successfully', result });
+  } catch (error) {
+    return res.status(500).json({ error: 'Unexpected error', details: error.message });
   }
 }
