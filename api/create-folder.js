@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     }
 
     // Step 2: Create Folder using the NickName
-    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}`;
+    const folderUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
     const folderPayload = {
       Name: folder_name,
       UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
