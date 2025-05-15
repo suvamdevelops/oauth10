@@ -1,3 +1,5 @@
+// File: /api/create-folder.js
+
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import axios from 'axios';
@@ -20,36 +22,47 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing required query parameters' });
   }
 
-  const method = 'POST';
-  const createFolderUrl = `https://api.smugmug.com/api/v2/folder/user/suvamp!folderroot`;
-
-  const request_data = {
-    url: createFolderUrl,
-    method: method,
-  };
-
   const token = {
     key: access_token,
     secret: access_token_secret,
   };
 
-  const folderHeaders = oauth.toHeader(oauth.authorize(request_data, token));
-  folderHeaders['Content-Type'] = 'application/json';
-  folderHeaders['Accept'] = 'application/json';
-
   try {
-    const response = await axios.post(
-      createFolderUrl,
-      {
-        Name: folder_name,
-        UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
-      },
-      {
-        headers: folderHeaders,
-      }
+    // Step 1: Get the user's NickName
+    const authUserUrl = 'https://api.smugmug.com/api/v2!authuser';
+    const authHeader1 = oauth.toHeader(
+      oauth.authorize({ url: authUserUrl, method: 'GET' }, token)
     );
 
-    res.status(200).json({ message: 'Folder created', data: response.data });
+    const authUserRes = await axios.get(authUserUrl, {
+      headers: {
+        ...authHeader1,
+        Accept: 'application/json',
+      },
+    });
+
+    const nickname = authUserRes.data.Response.User.NickName;
+
+    // Step 2: Create folder using NickName
+    const createUrl = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folderroot`;
+    const data = {
+      Name: folder_name,
+      UrlName: folder_name.toLowerCase().replace(/\s+/g, '-'),
+    };
+
+    const authHeader2 = oauth.toHeader(
+      oauth.authorize({ url: createUrl, method: 'POST', data }, token)
+    );
+
+    const createRes = await axios.post(createUrl, data, {
+      headers: {
+        ...authHeader2,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    res.status(200).json({ message: 'Folder created', data: createRes.data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create folder', details: err.response?.data || err.message });
   }
