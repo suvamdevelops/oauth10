@@ -14,35 +14,35 @@ module.exports = async (req, res) => {
   });
 
   req.on('end', async () => {
-    const { accessToken, accessTokenSecret, nickname, folderName } = JSON.parse(body);
-
-    if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const oauth = OAuth({
-      consumer: {
-        key: process.env.SMUGMUG_API_KEY,
-        secret: process.env.SMUGMUG_API_SECRET,
-      },
-      signature_method: 'HMAC-SHA1',
-      hash_function(base_string, key) {
-        return crypto.createHmac('sha1', key).update(base_string).digest('base64');
-      },
-    });
-
-    const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
-    const method = 'POST';
-    const data = {
-      Name: folderName,
-      UrlName: folderName.replace(/\s+/g, ''),
-    };
-
-    const authHeader = oauth.toHeader(
-      oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
-    );
-
     try {
+      const { accessToken, accessTokenSecret, nickname, folderName } = JSON.parse(body);
+
+      if (!accessToken || !accessTokenSecret || !nickname || !folderName) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const oauth = OAuth({
+        consumer: {
+          key: process.env.SMUGMUG_CONSUMER_KEY,
+          secret: process.env.SMUGMUG_CONSUMER_SECRET,
+        },
+        signature_method: 'HMAC-SHA1',
+        hash_function(base_string, key) {
+          return crypto.createHmac('sha1', key).update(base_string).digest('base64');
+        },
+      });
+
+      const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}!folders`;
+      const method = 'POST';
+      const data = {
+        Name: folderName,
+        UrlName: folderName.replace(/\s+/g, ''),
+      };
+
+      const authHeader = oauth.toHeader(
+        oauth.authorize({ url, method }, { key: accessToken, secret: accessTokenSecret })
+      );
+
       const response = await fetch(url, {
         method,
         headers: {
