@@ -1,6 +1,6 @@
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
-import axios from 'axios';
+import fetch from 'node-fetch';
 
 const oauth = OAuth({
   consumer: {
@@ -29,23 +29,26 @@ export default async function handler(req, res) {
   );
 
   try {
-    const response = await axios.get(url, {
+    const response = await fetch(url, {
       headers: {
         ...headers,
         Accept: 'application/json',
       },
     });
 
-    const nickname = response.data?.Response?.User?.NickName;
+    const responseData = await response.json();
+    const nickname = responseData?.Response?.User?.NickName;
+    
     res.status(200).json({
       message: 'User info retrieved successfully',
       nickname,
-      raw: response.data
+      raw: responseData
     });
   } catch (err) {
     res.status(500).json({
       error: 'Failed to retrieve user info',
-      details: err.response?.data || err.message,
+      details: err.message,
+      stack: err.stack
     });
   }
 }
