@@ -1,7 +1,7 @@
-import url from 'url';
 import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
-import axios from 'axios';
+import fetch from 'node-fetch';
+import url from 'url';
 
 const oauth = OAuth({
   consumer: {
@@ -41,11 +41,17 @@ export default async function handler(req, res) {
     const data = { oauth_verifier };
     const headers = oauth.toHeader(oauth.authorize({ url: accessTokenUrl, method: 'POST', data }, token));
 
-    // Request access token from SmugMug
-    const response = await axios.post(accessTokenUrl, null, { headers });
+    // Request access token from SmugMug using fetch instead of axios
+    const response = await fetch(accessTokenUrl, {
+      method: 'POST',
+      headers
+    });
 
-    // Parse access token and secret from response (response.data is urlencoded string)
-    const params = new URLSearchParams(response.data);
+    // Parse response text
+    const responseText = await response.text();
+    
+    // Parse access token and secret from response
+    const params = new URLSearchParams(responseText);
     const accessToken = params.get('oauth_token');
     const accessTokenSecret = params.get('oauth_token_secret');
 
@@ -59,6 +65,10 @@ export default async function handler(req, res) {
     res.redirect(bubbleRedirectUrl);
 
   } catch (error) {
-    res.status(500).json({ error: 'OAuth callback failed', details: error.message });
+    res.status(500).json({ 
+      error: 'OAuth callback failed', 
+      details: error.message,
+      stack: error.stack 
+    });
   }
 }
