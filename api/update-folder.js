@@ -35,8 +35,8 @@ module.exports = async (req, res) => {
         },
       });
 
-      // SmugMug API endpoint for updating a folder
-      const url = `https://api.smugmug.com/api/v2/folder/user/${nickname}/${folderId}`;
+      // SmugMug API endpoint for updating a folder - use the FolderByID URI
+      const url = `https://api.smugmug.com/api/v2/folder/id/${folderId}`;
       const method = 'PATCH';
       const data = {
         Name: newFolderName,
